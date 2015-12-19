@@ -82,9 +82,10 @@ public class ClientHandler implements Runnable {
             }
             handleHandshake(requestHandshake);
             Frame clientFrame;
+            //write("test");
+            //write(":irc.losslessone.com 004 nullzion irc.losslessone.com hybrid-7.2.3+plexus-3.1.0(20151005_0-546) CDFGNRSUWXabcdfgijklnopqrsuwxyz BIMNORSabcehiklmnopqstvz Iabehkloqv");
             while((clientFrame = fetchNextFrame()) != null) {
                 String data = clientFrame.getUnmaskedData();
-                System.out.println(data);
                 if(data.indexOf(':') == 0) {
                     if(data.contains("CONNECT: ")) {
                         String destination = data.split("\\s")[1];
@@ -95,7 +96,7 @@ public class ClientHandler implements Runnable {
                     }
                 } else {
                     if(proxySocket != null) {
-                        System.out.println("C >>> " + data);
+                        System.out.println("C >>> " + data.replace("\n", ""));
                         proxySocket.write(data);
                     }
                 }
@@ -108,8 +109,8 @@ public class ClientHandler implements Runnable {
     
     private Frame fetchNextFrame() {
         try {
-            int opcode = ((int) inputStream.readUnsignedByte()) - 128;
-            int maskLength = inputStream.readUnsignedByte(); 
+            int opcode = ((int) inputStream.readByte() & 0xff) - 128;
+            int maskLength = inputStream.readByte() & 0xff; 
             Boolean mask = maskLength > 128;
             int length = maskLength - 128;
             if(length == 126) {
@@ -134,12 +135,19 @@ public class ClientHandler implements Runnable {
         return null;
     }
     
-    public void write(String data) {
-        Frame serverFrame = new Frame(data);
+    public synchronized void write(String data) {
+        Frame serverFrame;
         try {
-            System.out.println("C <<< " + serverFrame.getUnmaskedData());
-            outputStream.write(serverFrame.toBytes());
-        } catch (IOException ex) {
+            serverFrame = new Frame(data);
+            try {
+                System.out.println("C <<< " + serverFrame.getUnmaskedData());
+                byte[] outputFrame = serverFrame.toBytes();
+                outputStream.write(outputFrame);
+                outputStream.flush();
+            } catch (IOException ex) {
+                Logger.getLogger(ClientHandler.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        } catch (UnsupportedEncodingException ex) {
             Logger.getLogger(ClientHandler.class.getName()).log(Level.SEVERE, null, ex);
         }
     }

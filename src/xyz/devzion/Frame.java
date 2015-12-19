@@ -25,6 +25,7 @@ package xyz.devzion;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -47,8 +48,8 @@ public class Frame {
     private byte[] mask = null;
     private byte[] payload;
     
-    public Frame(String payload) {
-        this.payload = payload.getBytes();
+    public Frame(String payload) throws UnsupportedEncodingException {
+        this.payload = payload.getBytes("UTF-8");
         this.opcode = Frame.TEXT_FRAME;
         this.length = this.payload.length;
         this.finalFrame = true;
@@ -108,7 +109,24 @@ public class Frame {
         } else {
             data.write(opcode);
         }
-        data.write(length);
+        if(length > 126) {
+            data.write(126);
+            if(length < 256) {
+                data.write(0);
+                data.write(length);
+            } else {
+                byte[] extendedLength = new byte[2];
+                extendedLength[0] = (byte) ((length >>> 8) & 0xff);
+                extendedLength[1] = (byte) (length & 0xff);
+                try {
+                    data.write(extendedLength);
+                } catch (IOException ex) {
+                    Logger.getLogger(Frame.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        } else {
+            data.write(length);
+        }
         try {
             data.write(payload);
         } catch (IOException ex) {
